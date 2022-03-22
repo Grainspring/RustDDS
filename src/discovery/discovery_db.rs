@@ -458,8 +458,12 @@ impl DiscoveryDB {
           );
         }
       } else {
-        // We have to topic, but not from this participant
+        // We have the topic, but not from this participant
         // TODO: Check that there is agreement about topic type name (at least)
+          info!(
+            "Topic {:?} update also from {:?} via {:?}",
+            &topic_name, &updater, discovered_via,
+          );
         t.insert(updater.prefix, (discovered_via, dtd.clone())); // this should return None
         notify = true;
       }
@@ -572,10 +576,10 @@ impl DiscoveryDB {
       .external_topic_writers
       .range(participant.range())
       .map(|(_guid, dwd)| dwd);
-    info!(
-      "Writers on participant {:?} are {:?}",
-      participant, on_particiapnt
-    );
+    // info!(
+    //   "Writers on participant {:?} are {:?}",
+    //   participant, on_particiapnt
+    // );
     on_particiapnt
       .filter(|dwd| dwd.publication_topic_data.topic_name == topic_name)
       .cloned()

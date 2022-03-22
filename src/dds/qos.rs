@@ -229,6 +229,10 @@ impl QosPolicies {
     self.reliability
   }
 
+  pub const fn is_reliable(&self) -> bool {
+    if let Some(policy::Reliability::Reliable{..}) = self.reliability { true } else { false }
+  }
+
   pub const fn destination_order(&self) -> Option<policy::DestinationOrder> {
     self.destination_order
   }

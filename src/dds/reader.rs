@@ -335,6 +335,10 @@ impl Reader {
             total: CountWithChange::new(self.writer_match_count_total, count_change),
             current: CountWithChange::new(self.matched_writers.len() as i32, count_change),
           });
+          if offered_qos.is_reliable() {
+            // TODO: This is too general, send acknacks to all writer proxies rather than just this one.
+            self.send_preemptive_acknacks()
+          }
           info!(
             "Matched new remote writer on topic={:?} writer= {:?}",
             self.topic_name, writer_id
@@ -998,7 +1002,7 @@ impl Reader {
     let reader_id = self.entity_id();
     for (_, writer_proxy) in writer_proxies
       .iter_mut()
-      .filter(|(_, p)| p.no_changes_received())
+      //.filter(|(_, p)| p.no_changes_received())
     {
       let acknack_count = writer_proxy.next_ack_nack_sequence_number();
       self.send_acknack_to(

@@ -158,9 +158,9 @@ impl Discovery {
   const PARTICIPANT_CLEANUP_PERIOD: StdDuration = StdDuration::from_secs(2);
   const TOPIC_CLEANUP_PERIOD: StdDuration = StdDuration::from_secs(60); // timer for cleaning up inactive topics
   const SEND_PARTICIPANT_INFO_PERIOD: StdDuration = StdDuration::from_secs(2);
-  const SEND_READERS_INFO_PERIOD: StdDuration = StdDuration::from_secs(2);
-  const SEND_WRITERS_INFO_PERIOD: StdDuration = StdDuration::from_secs(2);
-  const SEND_TOPIC_INFO_PERIOD: StdDuration = StdDuration::from_secs(10);
+  const SEND_READERS_INFO_PERIOD: StdDuration = StdDuration::from_secs(10);
+  const SEND_WRITERS_INFO_PERIOD: StdDuration = StdDuration::from_secs(10);
+  const SEND_TOPIC_INFO_PERIOD: StdDuration = StdDuration::from_secs(20);
   const CHECK_PARTICIPANT_MESSAGES: StdDuration = StdDuration::from_secs(1);
 
   pub(crate) const PARTICIPANT_MESSAGE_QOS: QosPolicies = QosPolicies {
