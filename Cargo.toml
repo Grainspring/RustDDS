@@ -17,7 +17,6 @@ mio = "^0.6.23"
 mio-extras = "2.0.6"
 bit-vec = "0.6.2"
 speedy = "0.8.0"
-log = "0.4.11"
 num-traits = "0.2"
 num-derive = "0.3"
 serde = { version = "1.0", features = ["derive"] }
@@ -33,6 +32,11 @@ bytes = "1"
 static_assertions = "1.1"
 thiserror = "1.0.29"
 cdr-encoding-size = { version="^0.5" }
+tracing = "0.1"
+tracing-attributes =  "0.1.2"
+tracing-libatrace = "0.1"
+tracing-subscriber = { version = "0.3.3", default-features = false, features = ["fmt", "env-filter", "smallvec", "parking_lot", "ansi"] }
+tracing-tree = "0.2.0"
 
 [target.'cfg(windows)'.dependencies]
 local-ip-address = "0.4.4"

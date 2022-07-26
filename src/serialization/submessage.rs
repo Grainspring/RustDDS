@@ -33,7 +33,7 @@ impl<C: Context> Writable<C> for SubMessage {
 mod tests {
   use bytes::Bytes;
   use enumflags2::BitFlags;
-  use log::info;
+  use tracing::info;
   use speedy::{Readable, Writable};
 
   use super::SubMessage;

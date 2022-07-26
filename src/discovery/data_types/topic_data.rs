@@ -700,7 +700,7 @@ impl Key for ParticipantMessageDataKey {}
 mod tests {
   use byteorder::LittleEndian;
   use bytes::Bytes;
-  use log::info;
+  use tracing::info;
 
   use crate::dds::traits::serde_adapters::no_key::SerializerAdapter;
   use super::*;

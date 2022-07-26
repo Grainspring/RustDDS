@@ -1,5 +1,5 @@
 use enumflags2::BitFlags;
-use log::error;
+use tracing::error;
 use speedy::{Readable, Writable};
 
 use crate::{

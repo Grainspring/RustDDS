@@ -95,7 +95,7 @@ impl Error {
 #[macro_export]
 macro_rules! log_and_err_precondition_not_met {
   ($err_msg:literal) => {{
-    log::error!($err_msg);
+    tracing::error!($err_msg);
     Error::precondition_not_met($err_msg)
   }};
 }
@@ -104,7 +104,7 @@ macro_rules! log_and_err_precondition_not_met {
 #[macro_export]
 macro_rules! log_and_err_internal {
   ($($arg:tt)*) => (
-      { log::error!($($arg)*);
+      { tracing::error!($($arg)*);
         Err( Error::Internal{ reason: format!($($arg)*) } )
       }
     )

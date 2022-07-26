@@ -87,12 +87,14 @@ where
   /// let some_data = SomeType {};
   /// data_writer.write(some_data, None).unwrap();
   /// ```
+  #[tracing::instrument(level = "trace", skip(self, data))]
   pub fn write(&self, data: D, source_timestamp: Option<Timestamp>) -> Result<()> {
     self
       .keyed_datawriter
       .write(NoKeyWrapper::<D> { d: data }, source_timestamp)
   }
 
+  #[tracing::instrument(level = "trace", skip(self, data))]
   pub fn write_with_options(
     &self,
     data: D,
@@ -129,6 +131,7 @@ where
   ///
   /// data_writer.wait_for_acknowledgments(Duration::from_millis(100));
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn wait_for_acknowledgments(&self, max_wait: Duration) -> Result<bool> {
     self.keyed_datawriter.wait_for_acknowledgments(max_wait)
   }

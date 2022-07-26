@@ -5,7 +5,7 @@ use std::{
 };
 
 #[allow(unused_imports)]
-use log::{debug, error, info, trace};
+use tracing::{debug, error, info, trace};
 
 use crate::{
   dds::{

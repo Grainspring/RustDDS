@@ -10,7 +10,7 @@ use std::{
 use serde::de::DeserializeOwned;
 use mio_extras::channel as mio_channel;
 #[allow(unused_imports)]
-use log::{debug, error, info, warn};
+use tracing::{debug, error, info, warn};
 use mio::{Evented, Poll, PollOpt, Ready, Token};
 
 use crate::{
@@ -264,6 +264,7 @@ where
   ///   }
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn read(
     &mut self,
     max_samples: usize,
@@ -328,6 +329,7 @@ where
   ///   }
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn take(
     &mut self,
     max_samples: usize,
@@ -384,6 +386,7 @@ where
   ///   // do something
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn read_next_sample(&mut self) -> Result<Option<DataSample<&D>>> {
     let mut ds = self.read(1, ReadCondition::not_read())?;
     Ok(ds.pop())
@@ -426,6 +429,7 @@ where
   ///   // do something
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn take_next_sample(&mut self) -> Result<Option<DataSample<D>>> {
     let mut ds = self.take(1, ReadCondition::not_read())?;
     Ok(ds.pop())
@@ -434,6 +438,7 @@ where
   // Iterator interface
 
   // Iterator helpers: _bare versions do not fetch or even construct metadata.
+  #[tracing::instrument(level = "trace", skip(self))]
   fn read_bare(
     &mut self,
     max_samples: usize,
@@ -452,6 +457,7 @@ where
     Ok(result)
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn take_bare(
     &mut self,
     max_samples: usize,
@@ -510,6 +516,7 @@ where
   ///   // do something
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn iterator(&mut self) -> Result<impl Iterator<Item = std::result::Result<&D, D::K>>> {
     // TODO: We could come up with a more efficent implementation than wrapping a
     // read call
@@ -559,6 +566,7 @@ where
   ///   // do something
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn conditional_iterator(
     &mut self,
     read_condition: ReadCondition,
@@ -609,6 +617,7 @@ where
   ///   // do something
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn into_iterator(&mut self) -> Result<impl Iterator<Item = std::result::Result<D, D::K>>> {
     // TODO: We could come up with a more efficent implementation than wrapping a
     // read call
@@ -660,6 +669,7 @@ where
   ///   // do something
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn into_conditional_iterator(
     &mut self,
     read_condition: ReadCondition,
@@ -672,6 +682,7 @@ where
   // Gets all unseen cache_changes from the TopicCache. Deserializes
   // the serialized payload and stores the DataSamples (the actual data and the
   // samplestate) to local container, datasample_cache.
+  #[tracing::instrument(level = "trace", skip(self))]
   fn fill_local_datasample_cache(&mut self) {
     let is_reliable = matches!(
       self.qos_policy.reliability(),
@@ -853,6 +864,7 @@ where
     } // for loop
   } // fn
 
+  #[tracing::instrument(level = "trace", skip(self, instance_key))]
   fn infer_key(
     &self,
     instance_key: Option<<D as Keyed>::K>,
@@ -915,6 +927,7 @@ where
   ///   }
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self, instance_key))]
   pub fn read_instance(
     &mut self,
     max_samples: usize,
@@ -988,6 +1001,7 @@ where
   ///   }
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self, instance_key))]
   pub fn take_instance(
     &mut self,
     max_samples: usize,
@@ -1268,6 +1282,7 @@ where
     self.status_receiver.as_status_evented()
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn try_recv_status(&self) -> Option<DataReaderStatus> {
     self.status_receiver.try_recv_status()
   }
@@ -1306,7 +1321,7 @@ mod tests {
 
   use bytes::Bytes;
   use mio_extras::channel as mio_channel;
-  use log::info;
+  use tracing::info;
   use byteorder::LittleEndian;
 
   use super::*;

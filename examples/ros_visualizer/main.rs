@@ -5,17 +5,12 @@ mod visualization_helpers;
 mod visualizator_app;
 
 use std::{
+  env,
   error::Error,
   io,
   time::{Duration, Instant},
 };
 
-use log::LevelFilter;
-use log4rs::{
-  append::console::ConsoleAppender,
-  config::{Appender, Root},
-  Config,
-};
 use messages::{DataUpdate, RosCommand};
 use visualizator_app::VisualizatorApp;
 use mio::{Events, Poll, PollOpt, Ready, Token};
@@ -29,6 +24,10 @@ use crossterm::{
 use tui::{
   backend::{Backend, CrosstermBackend},
   Terminal,
+};
+use tracing_subscriber::{
+  filter::{Directive, EnvFilter, LevelFilter},
+  layer::SubscriberExt,
 };
 
 const ROS2_COMMAND_TOKEN: Token = Token(1000);
@@ -173,33 +172,40 @@ fn ros2_loop(
   }
 }
 
-fn configure_logging() {
-  // initialize logging, preferably from config file
-  log4rs::init_file(
-    "examples/ros_visualizer/logging-config.yaml",
-    log4rs::config::Deserializers::default(),
-  )
-  .unwrap_or_else(|e| {
-    match e.downcast_ref::<io::Error>() {
-      // Config file did not work. If it is a simple "No such file or directory", then
-      // substitute some default config.
-      Some(os_err) if os_err.kind() == io::ErrorKind::NotFound => {
-        println!("No config file found in current working directory.");
-        let stdout = ConsoleAppender::builder().build();
-        let conf = Config::builder()
-          .appender(Appender::builder().build("stdout", Box::new(stdout)))
-          .build(Root::builder().appender("stdout").build(LevelFilter::Error))
-          .unwrap();
-        log4rs::init_config(conf).unwrap();
-      }
-      // Give up.
-      other_error => panic!("Config problem: {:?}", other_error),
-    }
-  });
+/// In contrast to `init_env_logger` this allows you to choose an env var
+/// other than `ENV_LOG`.
+pub fn init_env_logger(env: &str) -> Result<(), core::fmt::Error> {
+  let filter = match env::var(env) {
+    Ok(env) => EnvFilter::new(env),
+    _ => EnvFilter::default().add_directive(Directive::from(LevelFilter::WARN)),
+  };
+  let atrace_log = match env::var(String::from(env) + "_ATRACE") {
+    Ok(_) => true,
+    Err(_) => false,
+  };
+  if !atrace_log {
+    let layer = tracing_tree::HierarchicalLayer::default()
+      .with_writer(io::stderr)
+      .with_indent_lines(true)
+      .with_targets(true)
+      .with_indent_amount(2);
+    let layer = layer.with_thread_ids(true).with_thread_names(true);
+    let subscriber = tracing_subscriber::Registry::default()
+      .with(filter)
+      .with(layer);
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+  } else {
+    let layer = tracing_libatrace::layer().unwrap();
+    let subscriber = tracing_subscriber::Registry::default()
+      .with(filter)
+      .with(layer);
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+  }
+  Ok(())
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-  configure_logging();
+  let _r = init_env_logger("ENV_LOG");
   enable_raw_mode().unwrap();
   let mut stdout = io::stdout();
   execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();

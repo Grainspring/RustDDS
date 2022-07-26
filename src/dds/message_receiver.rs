@@ -1,7 +1,7 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
 use mio_extras::{channel as mio_channel, channel::TrySendError};
-use log::{debug, info, trace, warn};
+use tracing::{debug, info, trace, warn};
 use bytes::Bytes;
 
 use crate::{
@@ -176,6 +176,7 @@ impl MessageReceiver {
   // }
 
   pub fn handle_received_packet(&mut self, msg_bytes: &Bytes) {
+    trace!("handle_received_packet, msg_bytes:{:?}", msg_bytes);
     // Check for RTPS ping message. At least RTI implementation sends these.
     // What should we do with them? The spec does not say.
     if msg_bytes.len() < RTPS_MESSAGE_HEADER_SIZE {
@@ -210,6 +211,7 @@ impl MessageReceiver {
 
   // This is also called directly from dp_event_loop in case of loopback messages.
   pub fn handle_parsed_message(&mut self, rtps_message: Message) {
+    trace!("handle_parsed_message, msg:{:?}", rtps_message);
     self.reset();
     self.dest_guid_prefix = self.own_guid_prefix;
     self.source_guid_prefix = rtps_message.header.guid_prefix;
@@ -425,7 +427,7 @@ mod tests {
 
   use speedy::{Readable, Writable};
   use byteorder::LittleEndian;
-  use log::info;
+  use tracing::info;
   use serde::{Deserialize, Serialize};
   use mio_extras::channel as mio_channel;
 

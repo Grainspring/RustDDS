@@ -3,7 +3,7 @@ use std::{cmp::max, collections::BTreeMap, iter};
 
 use enumflags2::BitFlags;
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
   dds::{ddsdata::DDSData, fragment_assembler::FragmentAssembler},

@@ -4,16 +4,15 @@
 #![warn(clippy::pedantic)]
 
 use std::{
-  io,
+  env, io,
   time::{Duration, Instant},
 };
 
-use log::{debug, error, trace, LevelFilter};
-use log4rs::{
-  append::console::ConsoleAppender,
-  config::{Appender, Root},
-  Config,
+use tracing_subscriber::{
+  filter::{Directive, EnvFilter, LevelFilter},
+  layer::SubscriberExt,
 };
+use tracing::{debug, error, trace};
 use rustdds::{
   DomainParticipant, Keyed, QosPolicyBuilder, StatusEvented, TopicDescription, TopicKind,
 };
@@ -50,7 +49,7 @@ const WRITER_STATUS_READY: Token = Token(3);
 
 #[allow(clippy::too_many_lines)]
 fn main() {
-  configure_logging();
+  let _r = init_env_logger("ENV_LOG");
   let matches = get_matches();
 
   // Process command line arguments
@@ -136,7 +135,11 @@ fn main() {
     topic.name(),
     topic.get_type().name()
   );
-
+  trace!(
+    "Topic name is {}. Type is {}.",
+    topic.name(),
+    topic.get_type().name()
+  );
   // Set Ctrl-C handler
   let (stop_sender, stop_receiver) = channel::channel();
   ctrlc::set_handler(move || {
@@ -241,14 +244,24 @@ fn main() {
                 trace!("DataReader triggered");
                 match reader.take_next_sample() {
                   Ok(Some(sample)) => match sample.into_value() {
-                    Ok(sample) => println!(
-                      "{:10.10} {:10.10} {:3.3} {:3.3} [{}]",
-                      topic.name(),
-                      sample.color,
-                      sample.x,
-                      sample.y,
-                      sample.shapesize,
-                    ),
+                    Ok(sample) => {
+                      println!(
+                        "{:10.10} {:10.10} {:3.3} {:3.3} [{}]",
+                        topic.name(),
+                        sample.color,
+                        sample.x,
+                        sample.y,
+                        sample.shapesize,
+                      );
+                      trace!(
+                        "{:10.10} {:10.10} {:3.3} {:3.3} [{}]",
+                        topic.name(),
+                        sample.color,
+                        sample.x,
+                        sample.y,
+                        sample.shapesize,
+                      );
+                    }
                     Err(key) => println!("Disposed key {:?}", key),
                   },
                   Ok(None) => break, // no more data
@@ -265,6 +278,7 @@ fn main() {
           Some(ref mut reader) => {
             while let Some(status) = reader.try_recv_status() {
               println!("DataReader status: {:?}", status);
+              trace!("DataReader status: {:?}", status);
             }
           }
           None => {
@@ -276,6 +290,7 @@ fn main() {
           Some(ref mut writer) => {
             while let Some(status) = writer.try_recv_status() {
               println!("DataWriter status: {:?}", status);
+              trace!("DataWriter status: {:?}", status);
             }
           }
           None => {
@@ -284,6 +299,7 @@ fn main() {
         },
         other_token => {
           println!("Polled event is {:?}. WTF?", other_token);
+          trace!("Polled event is {:?}. WTF?", other_token);
         }
       }
     }
@@ -294,11 +310,12 @@ fn main() {
     y_vel = r.2;
 
     // write to DDS
-    trace!("Writing shape color {}", &color);
     match writer_opt {
       Some(ref mut writer) => {
         let now = Instant::now();
         if last_write + loop_delay < now {
+          // write to DDS
+          trace!("Writing shape color {} in {:?}", &color, last_write);
           writer
             .write(shape_sample.clone(), None)
             .unwrap_or_else(|e| error!("DataWriter write failed: {:?}", e));
@@ -315,29 +332,36 @@ fn main() {
   } // loop
 }
 
-fn configure_logging() {
-  // initialize logging, preferably from config file
-  log4rs::init_file(
-    "logging-config.yaml",
-    log4rs::config::Deserializers::default(),
-  )
-  .unwrap_or_else(|e| {
-    match e.downcast_ref::<io::Error>() {
-      // Config file did not work. If it is a simple "No such file or directory", then
-      // substitute some default config.
-      Some(os_err) if os_err.kind() == io::ErrorKind::NotFound => {
-        println!("No config file found in current working directory.");
-        let stdout = ConsoleAppender::builder().build();
-        let conf = Config::builder()
-          .appender(Appender::builder().build("stdout", Box::new(stdout)))
-          .build(Root::builder().appender("stdout").build(LevelFilter::Error))
-          .unwrap();
-        log4rs::init_config(conf).unwrap();
-      }
-      // Give up.
-      other_error => panic!("Config problem: {:?}", other_error),
-    }
-  });
+/// In contrast to `init_env_logger` this allows you to choose an env var
+/// other than `ENV_LOG`.
+pub fn init_env_logger(env: &str) -> Result<(), core::fmt::Error> {
+  let filter = match env::var(env) {
+    Ok(env) => EnvFilter::new(env),
+    _ => EnvFilter::default().add_directive(Directive::from(LevelFilter::WARN)),
+  };
+  let atrace_log = match env::var(String::from(env) + "_ATRACE") {
+    Ok(_) => true,
+    Err(_) => false,
+  };
+  if !atrace_log {
+    let layer = tracing_tree::HierarchicalLayer::default()
+      .with_writer(io::stderr)
+      .with_indent_lines(true)
+      .with_targets(true)
+      .with_indent_amount(2);
+    let layer = layer.with_thread_ids(true).with_thread_names(true);
+    let subscriber = tracing_subscriber::Registry::default()
+      .with(filter)
+      .with(layer);
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+  } else {
+    let layer = tracing_libatrace::layer().unwrap();
+    let subscriber = tracing_subscriber::Registry::default()
+      .with(filter)
+      .with(layer);
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+  }
+  Ok(())
 }
 
 fn get_matches() -> ArgMatches {

@@ -9,13 +9,13 @@ const TIMEOUT_EPSILON: Duration = Duration::from_nanos(1000);
 // Always give background thread 1 ms to react
 const TIMEOUT_FALLBACK: Duration = Duration::from_nanos(1_000_000);
 
+#[tracing::instrument(level = "trace", skip(sender, t))]
 pub fn try_send_timeout<T>(
   sender: &SyncSender<T>,
   t: T,
   timeout_opt: Option<Duration>,
 ) -> Result<(), TrySendError<T>> {
   // TODO: Write a more optimized fast path, where send succeeds on first try.
-
   let timeout = timeout_opt.unwrap_or(TIMEOUT_FALLBACK);
   let mut delays = Vec::with_capacity(20);
   if timeout <= TIMEOUT_EPSILON {

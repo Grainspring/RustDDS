@@ -2,7 +2,7 @@ use std::time::Duration as StdDuration;
 
 use bytes::Bytes;
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use byteorder::{BigEndian, LittleEndian};
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 

@@ -12,7 +12,7 @@ use std::{
 use mio_extras::channel as mio_channel;
 use mio::Token;
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
   dds::{
@@ -72,7 +72,7 @@ impl DomainParticipant {
     // Discovery thread receives and decodes updates from the wire.
     // It updates data to DiscoveryDB, and sends notifications to dp_event_loop,
     // which owns the Readers and Writers and notifies them also.
-    let (discovery_updated_sender, discovery_update_notification_receiver) =
+    let (discovery_update_notification_sender, discovery_update_notification_receiver) =
       mio_channel::sync_channel::<DiscoveryNotificationType>(32);
 
     // This channel is used to:
@@ -106,13 +106,13 @@ impl DomainParticipant {
     let dp_clone = dp.weak_clone();
     let disc_db_clone = dp.discovery_db();
     let discovery_handle = thread::Builder::new()
-      .name("RustDDS discovery thread".to_string())
+      .name("DiscoveryThrd".to_string())
       .spawn(move || {
         if let Ok(mut discovery) = Discovery::new(
           dp_clone,
           disc_db_clone,
           discovery_started_sender,
-          discovery_updated_sender,
+          discovery_update_notification_sender,
           discovery_command_receiver,
           spdp_liveness_receiver,
           self_locators,
@@ -154,6 +154,7 @@ impl DomainParticipant {
   /// let qos = QosPolicyBuilder::new().build();
   /// let publisher = domain_participant.create_publisher(&qos);
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn create_publisher(&self, qos: &QosPolicies) -> Result<Publisher> {
     let w = self.weak_clone(); // this must be done first to avoid deadlock
     self.dpi.lock().unwrap().create_publisher(&w, qos)
@@ -175,6 +176,7 @@ impl DomainParticipant {
   /// let qos = QosPolicyBuilder::new().build();
   /// let subscriber = domain_participant.create_subscriber(&qos);
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn create_subscriber(&self, qos: &QosPolicies) -> Result<Subscriber> {
     // println!("DP(outer): create_subscriber");
     let w = self.weak_clone(); // do this first, avoid deadlock
@@ -199,6 +201,7 @@ impl DomainParticipant {
   /// let qos = QosPolicyBuilder::new().build();
   /// let topic = domain_participant.create_topic("some_topic".to_string(), "SomeType".to_string(), &qos, TopicKind::WithKey);
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn create_topic(
     &self,
     name: String,
@@ -523,6 +526,7 @@ impl DomainParticipantDisc {
   //   self.dpi.lock().unwrap().discovery_db.clone()
   // }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub(crate) fn assert_liveliness(&self) -> Result<()> {
     // No point in checking for the LIVELINESS QoS of MANUAL_BY_PARTICIPANT,
     // the discovery command mutates a field which is only read
@@ -736,7 +740,7 @@ impl DomainParticipantInner {
     let dds_cache_clone = dds_cache.clone();
     let disc_db_clone = discovery_db.clone();
     let ev_loop_handle = thread::Builder::new()
-      .name(format!("RustDDS Participant {} event loop", participant_id))
+      .name(format!("ParticipantThrd_{}", participant_id))
       .spawn(move || {
         let dp_event_loop = DPEventLoop::new(
           domain_info,
@@ -1009,7 +1013,7 @@ mod tests {
   };
 
   use enumflags2::BitFlags;
-  use log::info;
+  use tracing::info;
   use speedy::{Endianness, Writable};
   use byteorder::LittleEndian;
 

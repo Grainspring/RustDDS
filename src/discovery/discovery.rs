@@ -5,7 +5,7 @@ use std::{
 };
 
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use mio::{Events, Poll, PollOpt, Ready, Token};
 use mio_extras::{channel as mio_channel, timer::Timer};
 
@@ -92,7 +92,7 @@ pub(crate) struct Discovery {
   // Discovery started sender confirms to application thread that we are running
   discovery_started_sender: std::sync::mpsc::Sender<Result<()>>,
   // notification sender goes to dp_event_loop thread
-  discovery_updated_sender: mio_channel::SyncSender<DiscoveryNotificationType>,
+  discovery_update_notification_sender: mio_channel::SyncSender<DiscoveryNotificationType>,
   // Discovery gets commands from dp_event_loop from this channel
   discovery_command_receiver: mio_channel::Receiver<DiscoveryCommand>,
   spdp_liveness_receiver: mio_channel::Receiver<GuidPrefix>,
@@ -184,7 +184,7 @@ impl Discovery {
     domain_participant: DomainParticipantWeak,
     discovery_db: Arc<RwLock<DiscoveryDB>>,
     discovery_started_sender: std::sync::mpsc::Sender<Result<()>>,
-    discovery_updated_sender: mio_channel::SyncSender<DiscoveryNotificationType>,
+    discovery_update_notification_sender: mio_channel::SyncSender<DiscoveryNotificationType>,
     discovery_command_receiver: mio_channel::Receiver<DiscoveryCommand>,
     spdp_liveness_receiver: mio_channel::Receiver<GuidPrefix>,
     self_locators: HashMap<Token, Vec<Locator>>,
@@ -538,7 +538,7 @@ impl Discovery {
       domain_participant,
       discovery_db,
       discovery_started_sender,
-      discovery_updated_sender,
+      discovery_update_notification_sender,
       discovery_command_receiver,
       spdp_liveness_receiver,
       self_locators,
@@ -784,7 +784,9 @@ impl Discovery {
   // built-in and user-defined.
   // If we did not do this, the Readers and Writers in this participant could not
   // find each other.
+  #[tracing::instrument(level = "trace", skip(self))]
   fn initialize_participant(&self) {
+    trace!("discovery.initialize_participant");
     let dp = if let Some(dp) = self.domain_participant.clone().upgrade() {
       dp
     } else {
@@ -885,6 +887,7 @@ impl Discovery {
     });
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn handle_participant_reader(&mut self) {
     loop {
       let s = self.dcps_participant_reader.read_next_sample();
@@ -937,6 +940,7 @@ impl Discovery {
   }
 
   // Check if there are messages about new Readers
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn handle_subscription_reader(&mut self, read_history: Option<GuidPrefix>) {
     let drds: Vec<std::result::Result<DiscoveredReaderData, GUID>> =
       match self.dcps_subscription_reader.read(
@@ -999,6 +1003,7 @@ impl Discovery {
     } // loop
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn handle_publication_reader(&mut self, read_history: Option<GuidPrefix>) {
     let dwds: Vec<std::result::Result<DiscoveredWriterData, GUID>> =
       match self.dcps_publication_reader.read(
@@ -1051,6 +1056,7 @@ impl Discovery {
     } // loop
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn handle_topic_reader(&mut self, read_history: Option<GuidPrefix>) {
     let ts: Vec<std::result::Result<(DiscoveredTopicData, GUID), GUID>> =
       match self.dcps_topic_reader.read(
@@ -1122,6 +1128,7 @@ impl Discovery {
   // The protocol distinguises between automatic (by DDS library)
   // and manual (by by application, via DDS API call) liveness
   // TODO: rewrite this function according to the pattern above
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn handle_participant_message_reader(&mut self) {
     let participant_messages: Option<Vec<ParticipantMessageData>> = match self
       .dcps_participant_message_reader
@@ -1148,6 +1155,7 @@ impl Discovery {
   }
 
   // TODO: Explain what happens here and by what logic
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn write_participant_message(&mut self) {
     let writer_liveliness: Vec<Liveliness> = self
       .discovery_db_read()
@@ -1243,6 +1251,7 @@ impl Discovery {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn participant_cleanup(&self) {
     let removed_guid_prefixes = self.discovery_db_write().participant_cleanup();
     for guid_prefix in removed_guid_prefixes {
@@ -1251,10 +1260,12 @@ impl Discovery {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn topic_cleanup(&self) {
     self.discovery_db_write().topic_cleanup();
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn write_readers_info(&self) {
     let db = self.discovery_db_read();
     let local_user_readers = db.get_all_local_topic_readers().filter(|p| {
@@ -1276,6 +1287,7 @@ impl Discovery {
     debug!("Announced {} readers", count);
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn write_writers_info(&self) {
     let db = self.discovery_db_read();
     let local_user_writers = db.get_all_local_topic_writers().filter(|p| {
@@ -1300,6 +1312,7 @@ impl Discovery {
     debug!("Announced {} writers", count);
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn write_topic_info(&self) {
     let db = self.discovery_db_read();
     let datas = db.local_user_topics();
@@ -1390,8 +1403,9 @@ impl Discovery {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn send_discovery_notification(&self, dntype: DiscoveryNotificationType) {
-    match self.discovery_updated_sender.send(dntype) {
+    match self.discovery_update_notification_sender.send(dntype) {
       Ok(_) => (),
       Err(e) => error!("Failed to send DiscoveryNotification {:?}", e),
     }

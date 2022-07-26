@@ -97,6 +97,7 @@ where
   /// let mut data_reader = subscriber.create_datareader_no_key::<SomeType, CDRDeserializerAdapter<_>>(&topic, None).unwrap();
   /// let data = data_reader.read(10, ReadCondition::not_read());
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn read(
     &mut self,
     max_samples: usize,
@@ -145,6 +146,7 @@ where
   /// let mut data_reader = subscriber.create_datareader_no_key::<SomeType, CDRDeserializerAdapter<_>>(&topic, None).unwrap();
   /// let data = data_reader.take(10, ReadCondition::not_read());
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn take(
     &mut self,
     max_samples: usize,
@@ -188,6 +190,7 @@ where
   ///   // Do something
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn read_next_sample(&mut self) -> Result<Option<DataSample<&D>>> {
     let mut ds = self.read(1, ReadCondition::not_read())?;
     Ok(ds.pop())
@@ -220,6 +223,7 @@ where
   ///   // Do something
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn take_next_sample(&mut self) -> Result<Option<DataSample<D>>> {
     let mut ds = self.take(1, ReadCondition::not_read())?;
     Ok(ds.pop())
@@ -256,6 +260,7 @@ where
   ///   // Do something
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn iterator(&mut self) -> Result<impl Iterator<Item = &D>> {
     // TODO: We could come up with a more efficent implementation than wrapping a
     // read call
@@ -295,6 +300,7 @@ where
   ///   // Do something
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn conditional_iterator(
     &mut self,
     read_condition: ReadCondition,
@@ -340,6 +346,7 @@ where
   ///   // Do something
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn into_iterator(&mut self) -> Result<impl Iterator<Item = D>> {
     // TODO: We could come up with a more efficent implementation than wrapping a
     // read call
@@ -381,6 +388,7 @@ where
   ///   // Do something
   /// }
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn into_conditional_iterator(
     &mut self,
     read_condition: ReadCondition,

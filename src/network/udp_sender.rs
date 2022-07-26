@@ -6,7 +6,7 @@ use std::{
 use std::net::Ipv4Addr;
 
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use mio::net::UdpSocket;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 #[cfg(windows)]
@@ -24,6 +24,7 @@ pub struct UDPSender {
 
 impl UDPSender {
   pub fn new(sender_port: u16) -> io::Result<Self> {
+    debug!("UDPSender::new, sender_port:{}", sender_port);
     #[cfg(not(windows))]
     let unicast_socket = {
       let saddr: SocketAddr = SocketAddr::new("0.0.0.0".parse().unwrap(), sender_port);
@@ -73,9 +74,16 @@ impl UDPSender {
           if cfg!(windows) {
             raw_socket.set_reuse_address(true)?;
           } // Necessary? TODO: Check if necessary.
+          debug!(
+            "UDPSender::new, rawsocket with ipaddr:{:?}:{:?} for multicast",
+            multicast_if_ipaddr, 0
+          );
           raw_socket.bind(&SockAddr::from(SocketAddr::new(multicast_if_ipaddr, 0)))?;
         }
-        IpAddr::V6(_a) => error!("UDPSender::new() not implemented for IpV6"), // TODO
+        IpAddr::V6(a) => error!(
+          "UDPSender::new() without rawsocket implemented for IpV6Addr:{:?}",
+          a
+        ), // TODO
       }
 
       let mc_socket = std::net::UdpSocket::from(raw_socket);
@@ -89,7 +97,7 @@ impl UDPSender {
       unicast_socket,
       multicast_sockets,
     };
-    info!("UDPSender::new() --> {:?}", sender);
+    info!("UDPSender::new() results--> {:?}", sender);
     Ok(sender)
   }
 
@@ -105,6 +113,10 @@ impl UDPSender {
   }
 
   fn send_to_udp_socket(&self, buffer: &[u8], socket: &UdpSocket, addr: &SocketAddr) {
+    debug!(
+      "send_to_udp_socket, socket:{:?}, dest_addr:{:?}",
+      socket, addr
+    );
     match socket.send_to(buffer, addr) {
       Ok(bytes_sent) => {
         if bytes_sent == buffer.len() { // ok
@@ -125,10 +137,18 @@ impl UDPSender {
   pub fn send_to_locator(&self, buffer: &[u8], locator: &Locator) {
     let send = |socket_address: SocketAddr| {
       if socket_address.ip().is_multicast() {
+        debug!(
+          "send_to_locator, socket_addr:{:?} is multicast",
+          socket_address
+        );
         for socket in &self.multicast_sockets {
           self.send_to_udp_socket(buffer, socket, &socket_address);
         }
       } else {
+        debug!(
+          "send_to_locator, socket_addr:{:?} is unicast",
+          socket_address
+        );
         self.send_to_udp_socket(buffer, &self.unicast_socket, &socket_address);
       }
     };
@@ -151,6 +171,10 @@ impl UDPSender {
   #[cfg(test)]
   pub fn send_to_all(&self, buffer: &[u8], addresses: &[SocketAddr]) {
     for address in addresses.iter() {
+      debug!(
+        "send_to_all, use unicast_socket:{:?} dest_addr:{:?}",
+        address
+      );
       if self.unicast_socket.send_to(buffer, address).is_err() {
         debug!("Unable to send to {}", address);
       };
@@ -163,6 +187,10 @@ impl UDPSender {
       let address = SocketAddr::new(IpAddr::V4(address), port);
       let mut size = 0;
       for s in self.multicast_sockets {
+        debug!(
+          "send_to_multicast, raw_socket:{:?}, dest_addr:{:?}",
+          s, address
+        );
         size = s.send_to(buffer, &address)?;
       }
       Ok(size)

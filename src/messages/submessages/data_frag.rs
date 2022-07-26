@@ -1,6 +1,6 @@
 use std::io;
 
-use log::debug;
+use tracing::debug;
 use speedy::{Context, Error, Readable, Writable, Writer};
 use enumflags2::BitFlags;
 use bytes::Bytes;

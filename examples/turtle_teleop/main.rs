@@ -5,12 +5,15 @@ fn main() {
   println!("This example only works on a unix based system");
 }
 
-use std::time::Duration;
+use std::{env, io, time::Duration};
 
 #[cfg(unix)]
 use termion::raw::*;
 #[allow(unused_imports)]
-use log::{debug, error, info, warn};
+use tracing_subscriber::filter::{Directive, EnvFilter, LevelFilter};
+use tracing_subscriber::layer::SubscriberExt;
+#[allow(unused_imports)]
+use tracing::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use mio::{Events, Poll, PollOpt, Ready, Token};
 use mio_extras::channel as mio_channel;
@@ -68,12 +71,43 @@ impl Vector3 {
   };
 }
 
+/// In contrast to `init_env_logger` this allows you to choose an env var
+/// other than `ENV_LOG`.
+pub fn init_env_logger(env: &str) -> Result<(), core::fmt::Error> {
+  let filter = match env::var(env) {
+    Ok(env) => EnvFilter::new(env),
+    _ => EnvFilter::default().add_directive(Directive::from(LevelFilter::WARN)),
+  };
+  let atrace_log = match env::var(String::from(env) + "_ATRACE") {
+    Ok(_) => true,
+    Err(_) => false,
+  };
+  if !atrace_log {
+    let layer = tracing_tree::HierarchicalLayer::default()
+      .with_writer(io::stderr)
+      .with_indent_lines(true)
+      .with_targets(true)
+      .with_indent_amount(2);
+    let layer = layer.with_thread_ids(true).with_thread_names(true);
+    let subscriber = tracing_subscriber::Registry::default()
+      .with(filter)
+      .with(layer);
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+  } else {
+    let layer = tracing_libatrace::layer().unwrap();
+    let subscriber = tracing_subscriber::Registry::default()
+      .with(filter)
+      .with(layer);
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+  }
+  Ok(())
+}
+
 #[cfg(unix)]
 fn main() {
   // Here is a fixed path, so this example must be started from
   // RustDDS main directory
-  log4rs::init_file("examples/turtle_teleop/log4rs.yaml", Default::default()).unwrap();
-
+  let _r = init_env_logger("ENV_LOG");
   let (command_sender, command_receiver) = mio_channel::sync_channel::<RosCommand>(10);
   let (readback_sender, readback_receiver) = mio_channel::sync_channel(10);
   let (pose_sender, pose_receiver) = mio_channel::sync_channel(10);

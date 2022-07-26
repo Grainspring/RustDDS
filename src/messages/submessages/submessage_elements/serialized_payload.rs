@@ -3,7 +3,7 @@ use std::{cmp::min, io};
 use bytes::{Bytes, BytesMut};
 use speedy::{Context, Readable, Writable, Writer};
 use byteorder::ReadBytesExt;
-use log::warn;
+use tracing::warn;
 
 /// Used to identify serialization format of payload data over RTPS.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Readable, Writable)]

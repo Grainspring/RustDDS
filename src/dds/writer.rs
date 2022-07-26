@@ -8,7 +8,7 @@ use std::{
 };
 
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use speedy::{Endianness, Writable};
 use mio_extras::{
   channel::{self as mio_channel, SyncSender, TrySendError},
@@ -44,7 +44,7 @@ use super::{
   statusevents::{CountWithChange, DataWriterStatus},
 };
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum DeliveryMode {
   Unicast,
   Multicast,
@@ -312,6 +312,7 @@ impl Writer {
   // --------------------------------------------------------------
   // --------------------------------------------------------------
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn handle_timed_event(&mut self) {
     while let Some(e) = self.timed_event_timer.poll() {
       match e {
@@ -373,6 +374,7 @@ impl Writer {
   } // fn
 
   /// This is called by dp_wrapper everytime cacheCleaning message is received.
+  #[tracing::instrument(level = "trace", skip(self))]
   fn handle_cache_cleaning(&mut self) {
     let resource_limit = 32; // TODO: This limit should be obtained
                              // from Topic and Writer QoS. There should be some reasonable default limit
@@ -397,6 +399,7 @@ impl Writer {
   // --------------------------------------------------------------
 
   // Receive new data samples from the DDS DataWriter
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn process_writer_command(&mut self) {
     while let Ok(cc) = self.writer_command_receiver.try_recv() {
       match cc {
@@ -564,6 +567,7 @@ impl Writer {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn insert_to_history_cache(
     &mut self,
     data: DDSData,
@@ -625,6 +629,7 @@ impl Writer {
   // --------------------------------------------------------------
 
   /// This is called periodically.
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn handle_heartbeat_tick(&mut self, is_manual_assertion: bool) {
     // Reliable Stateless Writer will set the final flag.
     // Reliable Stateful Writer (that tracks Readers by ReaderProxy) will not set
@@ -671,6 +676,7 @@ impl Writer {
   /// samples, the Writer must respond by either sending the missing data
   /// samples, sending a GAP message when the sample is not relevant, or
   /// sending a HEARTBEAT message when the sample is no longer available
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn handle_ack_nack(
     &mut self,
     reader_guid_prefix: GuidPrefix,
@@ -769,6 +775,7 @@ impl Writer {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn update_ack_waiters(&mut self, guid: GUID, acked_before: Option<SequenceNumber>) {
     let mut completed = false;
     match &mut self.ack_waiter {
@@ -796,6 +803,7 @@ impl Writer {
 
   // Send out missing data
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn handle_repair_data_send(&mut self, to_reader: GUID) {
     // Note: here we remove the reader from our reader map temporarily.
     // Then we can mutate both the reader and other fields in self.
@@ -815,6 +823,7 @@ impl Writer {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn handle_repair_frags_send(&mut self, to_reader: GUID) {
     // see similar function above
     if let Some(mut reader_proxy) = self.readers.remove(&to_reader) {
@@ -829,6 +838,7 @@ impl Writer {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn handle_repair_data_send_worker(&mut self, reader_proxy: &mut RtpsReaderProxy) {
     // Note: The reader_proxy is now removed from readers map
     let reader_guid = reader_proxy.remote_reader_guid;
@@ -920,6 +930,7 @@ impl Writer {
     }
   } // fn
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn handle_repair_frags_send_worker(
     &mut self,
     reader_proxy: &mut RtpsReaderProxy, /* This is mutable proxy temporarily detached from the
@@ -991,6 +1002,7 @@ impl Writer {
   /// (Reliable) Depth is QoS policy History depth.
   /// Returns SequenceNumbers of removed CacheChanges
   /// This is called repeadedly by handle_cache_cleaning action.
+  #[tracing::instrument(level = "trace", skip(self))]
   fn remove_all_acked_changes_but_keep_depth(&mut self, depth: usize) {
     // All readers have acked up to this point (SequenceNumber)
     let acked_by_all_readers = self
@@ -1021,10 +1033,12 @@ impl Writer {
     self.sequence_number_to_instant = self.sequence_number_to_instant.split_off(&first_keeper);
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn increase_heartbeat_counter(&mut self) {
     self.heartbeat_message_counter += 1;
   }
 
+  #[tracing::instrument(level = "trace", skip(self, readers))]
   fn send_message_to_readers(
     &self,
     preferred_mode: DeliveryMode,
@@ -1082,6 +1096,7 @@ impl Writer {
   }
 
   // Send status to DataWriter or however is listening
+  #[tracing::instrument(level = "trace", skip(self))]
   fn send_status(&self, status: DataWriterStatus) {
     self
       .status_sender
@@ -1097,12 +1112,12 @@ impl Writer {
       });
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn update_reader_proxy(
     &mut self,
     reader_proxy: &RtpsReaderProxy,
     requested_qos: &QosPolicies,
   ) {
-    debug!("update_reader_proxy topic={:?}", self.my_topic_name);
     match self.qos_policies.compliance_failure_wrt(requested_qos) {
       // matched QoS
       None => {
@@ -1117,12 +1132,6 @@ impl Writer {
           if let Some(Reliability::Reliable { .. }) = self.qos_policies.reliability {
             self.notify_new_data_to_all_readers();
           }
-          info!(
-            "Matched new remote reader on topic={:?} reader={:?}",
-            self.topic_name(),
-            &reader_proxy.remote_reader_guid
-          );
-          debug!("Reader details: {:?}", &reader_proxy);
         }
       }
       Some(bad_policy_id) => {
@@ -1145,6 +1154,7 @@ impl Writer {
   // Update the given reader proxy. Preserve data we are tracking.
   // return 0 if the reader already existed
   // return 1 if it was new ( = count of added reader proxies)
+  #[tracing::instrument(level = "trace", skip(self))]
   fn matched_reader_update(&mut self, reader_proxy: RtpsReaderProxy) -> i32 {
     let (to_insert, count_change) = match self.readers.remove(&reader_proxy.remote_reader_guid) {
       None => (reader_proxy, 1),
@@ -1163,6 +1173,7 @@ impl Writer {
     count_change
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn matched_reader_remove(&mut self, guid: GUID) -> Option<RtpsReaderProxy> {
     let removed = self.readers.remove(&guid);
     if let Some(ref removed_reader) = removed {
@@ -1176,6 +1187,7 @@ impl Writer {
     removed
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn reader_lost(&mut self, guid: GUID) {
     if self.readers.contains_key(&guid) {
       info!(
@@ -1196,6 +1208,7 @@ impl Writer {
 
   // Entire remote participant was lost.
   // Remove all remote writers belonging to it.
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn participant_lost(&mut self, guid_prefix: GuidPrefix) {
     let lost_writers: Vec<GUID> = self
       .readers
@@ -1248,7 +1261,7 @@ mod tests {
   use std::thread;
 
   use byteorder::LittleEndian;
-  use log::info;
+  use tracing::info;
 
   use crate::{
     dds::{

@@ -8,7 +8,7 @@ use mio_extras::channel as mio_channel;
 use serde::{de::DeserializeOwned, Serialize};
 use byteorder::LittleEndian;
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
   dds::{
@@ -932,6 +932,7 @@ impl InnerSubscriber {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self, outer))]
   fn create_datareader_internal<D: 'static, SA>(
     &self,
     outer: &Subscriber,
@@ -1016,6 +1017,7 @@ impl InnerSubscriber {
     Ok(datareader)
   }
 
+  #[tracing::instrument(level = "trace", skip(self, outer))]
   pub fn create_datareader<D: 'static, SA>(
     &self,
     outer: &Subscriber,
@@ -1036,6 +1038,7 @@ impl InnerSubscriber {
     self.create_datareader_internal(outer, entity_id, topic, qos)
   }
 
+  #[tracing::instrument(level = "trace", skip(self, outer))]
   pub fn create_datareader_no_key<D: 'static, SA>(
     &self,
     outer: &Subscriber,
@@ -1070,6 +1073,7 @@ impl InnerSubscriber {
     self.domain_participant.clone().upgrade()
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub(crate) fn remove_reader(&self, guid: GUID) {
     self
       .sender_remove_reader

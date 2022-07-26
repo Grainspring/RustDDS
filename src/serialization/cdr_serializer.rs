@@ -592,7 +592,7 @@ impl<'a, W: io::Write, BO: ByteOrder> ser::SerializeStructVariant for &'a mut Cd
 
 #[cfg(test)]
 mod tests {
-  use log::info;
+  use tracing::info;
   use serde::{Deserialize, Serialize};
   use serde_repr::{Deserialize_repr, Serialize_repr};
 

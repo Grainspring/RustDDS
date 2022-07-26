@@ -4,7 +4,7 @@ use std::{convert::TryFrom, hash::Hash};
 
 use byteorder::BigEndian;
 use rand::Rng;
-use log::error;
+use tracing::error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub use cdr_encoding_size::*;
 

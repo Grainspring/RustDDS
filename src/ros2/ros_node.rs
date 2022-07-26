@@ -3,7 +3,7 @@ use std::{
   sync::{Arc, Mutex},
 };
 
-use log::{error, info};
+use tracing::{error, info};
 use mio::Evented;
 use serde::{de::DeserializeOwned, Serialize};
 

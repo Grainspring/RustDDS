@@ -4,7 +4,7 @@ use std::{
 };
 
 use mio::net::UdpSocket;
-use log::{debug, error, info, trace};
+use tracing::{debug, error, info, trace};
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use bytes::{Bytes, BytesMut};
 
@@ -80,8 +80,10 @@ impl UDPListener {
 
     let mio_socket = UdpSocket::from_socket(std_socket).expect("Unable to create mio socket");
     info!(
-      "UDPListener: new socket with address {:?}",
-      mio_socket.local_addr()
+      "UDPListener: new socket with addr: {:?}, port:{:?}, reuse addr:{}",
+      mio_socket.local_addr(),
+      port,
+      reuse_addr,
     );
 
     Ok(mio_socket)
@@ -96,6 +98,7 @@ impl UDPListener {
     }
   }
 
+  #[tracing::instrument(level = "trace")]
   pub fn new_unicast(host: &str, port: u16) -> io::Result<Self> {
     let mio_socket = Self::new_listening_socket(host, port, false)?;
 
@@ -106,6 +109,7 @@ impl UDPListener {
     })
   }
 
+  #[tracing::instrument(level = "trace")]
   pub fn new_multicast(host: &str, port: u16, multicast_group: Ipv4Addr) -> io::Result<Self> {
     if !multicast_group.is_multicast() {
       return io::Result::Err(io::Error::new(
@@ -119,9 +123,18 @@ impl UDPListener {
     for multicast_if_ipaddr in get_local_multicast_ip_addrs()? {
       match multicast_if_ipaddr {
         IpAddr::V4(a) => {
+          debug!(
+            "new_multicast, socket.join_multicast_v4, multicast_group:{:?} with ipaddr:{:?}",
+            multicast_group, a
+          );
           mio_socket.join_multicast_v4(&multicast_group, &a)?;
         }
-        IpAddr::V6(_a) => error!("UDPListener::new_multicast() not implemented for IpV6"), // TODO
+        IpAddr::V6(a) => {
+          error!(
+            "UDPListener::new_multicast() not implemented for IpV6Addr:{:?}",
+            a
+          ); // TODO
+        }
       }
     }
 
@@ -183,6 +196,7 @@ impl UDPListener {
   pub fn messages(&mut self) -> Vec<Bytes> {
     // This code may seem slighlty non-sensical, if you do not know
     // how BytesMut works.
+    trace!("udp_listener:{:?}, get messages", self);
     let mut messages = Vec::with_capacity(4); // just a guess, should cover most cases
     self.ensure_receive_buffer_capacity();
     while let Ok(nbytes) = self.socket.recv(&mut self.receive_buffer) {

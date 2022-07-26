@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, time::Instant};
 
 use chrono::Utc;
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
   dds::{
@@ -80,8 +80,8 @@ impl DiscoveryDB {
   }
 
   // Returns if particiapnt was previously unkonwn
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn update_participant(&mut self, data: &SpdpDiscoveredParticipantData) -> bool {
-    debug!("update_participant: {:?}", &data);
     let guid = data.participant_guid;
 
     // sanity check
@@ -124,6 +124,8 @@ impl DiscoveryDB {
 
     new_participant
   }
+
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn participant_is_alive(&mut self, guid_prefix: GuidPrefix) {
     if let Some(ts) = self.participant_last_life_signs.get_mut(&guid_prefix) {
       let now = Instant::now();
@@ -139,8 +141,8 @@ impl DiscoveryDB {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn remove_participant(&mut self, guid_prefix: GuidPrefix) {
-    info!("removing participant {:?}", guid_prefix);
     self.participant_proxies.remove(&guid_prefix);
     self.participant_last_life_signs.remove(&guid_prefix);
 
@@ -156,6 +158,7 @@ impl DiscoveryDB {
     self.participant_proxies.get(&guid_prefix)
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn remove_topic_reader_with_prefix(&mut self, guid_prefix: GuidPrefix) {
     // TODO: Implement this using .drain_filter() in BTreeMap once it lands in
     // stable.
@@ -169,11 +172,12 @@ impl DiscoveryDB {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn remove_topic_reader(&mut self, guid: GUID) {
-    info!("remove_topic_reader {:?}", guid);
     self.external_topic_readers.remove(&guid);
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn remove_topic_writer_with_prefix(&mut self, guid_prefix: GuidPrefix) {
     // TODO: Implement this using .drain_filter() in BTreeMap once it lands in
     // stable.
@@ -187,12 +191,14 @@ impl DiscoveryDB {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn remove_topic_writer(&mut self, guid: GUID) {
     self.external_topic_writers.remove(&guid);
   }
 
   // Delete participant proxies, if we have not heard of them within
   // lease_duration
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn participant_cleanup(&mut self) -> Vec<GuidPrefix> {
     let inow = Instant::now();
 
@@ -227,6 +233,7 @@ impl DiscoveryDB {
     to_remove
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn topic_has_writers_or_readers(&self, topic_name: &str) -> bool {
     // TODO: This entire function has silly implementation.
     // We should really have a separate map from Topic to Readers & Writers
@@ -265,6 +272,7 @@ impl DiscoveryDB {
     false
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn topic_cleanup(&mut self) {
     // removing topics that have no readers or writers
     let dead_topics: Vec<_> = self
@@ -279,12 +287,14 @@ impl DiscoveryDB {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn update_local_topic_writer(&mut self, writer: DiscoveredWriterData) {
     self
       .local_topic_writers
       .insert(writer.writer_proxy.remote_writer_guid, writer);
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn remove_local_topic_writer(&mut self, guid: GUID) {
     self.local_topic_writers.remove(&guid);
   }
@@ -301,6 +311,7 @@ impl DiscoveryDB {
   // them from the remote participant.
   //
   // The topic is updated to the topics table.
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn update_subscription(&mut self, data: &DiscoveredReaderData) -> DiscoveredReaderData {
     let guid = data.reader_proxy.remote_reader_guid;
 
@@ -355,6 +366,7 @@ impl DiscoveryDB {
   }
 
   // TODO: This is silly. Returns one of the paramters cloned, or None
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn update_publication(&mut self, data: &DiscoveredWriterData) -> DiscoveredWriterData {
     let guid = data.writer_proxy.remote_writer_guid;
 
@@ -423,13 +435,13 @@ impl DiscoveryDB {
   // Topic update sends notifications, in case someone was waiting to find a
   // topic. Return value indicates whether the topic (name) was new to us. This
   // is used to add
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn update_topic_data(
     &mut self,
     dtd: &DiscoveredTopicData,
     updater: GUID,
     discovered_via: DiscoveredVia,
   ) {
-    trace!("Update topic data: {:?}", &dtd);
     let topic_name = dtd.topic_data.name.clone();
     let mut notify = false;
 
@@ -481,6 +493,7 @@ impl DiscoveryDB {
   }
 
   // local topic readers
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn update_local_topic_reader(
     &mut self,
     domain_participant: &DomainParticipant,
@@ -513,14 +526,17 @@ impl DiscoveryDB {
       .insert(reader_guid, discovered_reader_data);
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn remove_local_topic_reader(&mut self, guid: GUID) {
     self.local_topic_readers.remove(&guid);
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn get_all_local_topic_readers(&self) -> impl Iterator<Item = &DiscoveredReaderData> {
     self.local_topic_readers.iter().map(|(_, p)| p)
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn get_all_local_topic_writers(&self) -> impl Iterator<Item = &DiscoveredWriterData> {
     self.local_topic_writers.iter().map(|(_, p)| p)
   }
@@ -529,6 +545,7 @@ impl DiscoveryDB {
   // If multiple participants announce the same topic, this will
   // return duplicates, one per announcing particiapnt.
   // The duplicates are not necessarily identical, but may have different QoS.
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn all_user_topics(&self) -> impl Iterator<Item = &DiscoveredTopicData> {
     self
       .topics
@@ -538,6 +555,7 @@ impl DiscoveryDB {
   }
 
   // as above, but only from my GUID
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn local_user_topics(&self) -> impl Iterator<Item = &DiscoveredTopicData> {
     let me = self.my_guid.prefix;
     self
@@ -556,6 +574,7 @@ impl DiscoveryDB {
   // At least the QoS details may be different.
   // This just returns the first one found in the database, which is indexed by
   // GUID.
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn get_topic(&self, topic_name: &str) -> Option<&DiscoveredTopicData> {
     self
       .topics
@@ -563,6 +582,7 @@ impl DiscoveryDB {
       .and_then(|m| m.values().next().map(|t| &t.1))
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn writers_on_topic_and_participant(
     &self,
     topic_name: &str,
@@ -582,6 +602,7 @@ impl DiscoveryDB {
       .collect()
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn readers_on_topic_and_participant(
     &self,
     topic_name: &str,
@@ -598,6 +619,7 @@ impl DiscoveryDB {
 
   // // TODO: return iterator somehow?
   #[cfg(test)] // used only for testing
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn get_local_topic_readers<'a, T: TopicDescription>(
     &'a self,
     topic: &'a T,
@@ -611,6 +633,7 @@ impl DiscoveryDB {
       .collect()
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn update_lease_duration(&mut self, data: &ParticipantMessageData) {
     let now = Instant::now();
     let prefix = data.guid;

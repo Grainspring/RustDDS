@@ -3,7 +3,7 @@ use std::{
   ops::Bound,
 };
 
-use log::debug;
+use tracing::debug;
 
 use crate::{
   dds::{

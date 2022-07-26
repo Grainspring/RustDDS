@@ -4,7 +4,7 @@ use speedy::{Context, Readable, Reader, Writable, Writer};
 use serde::{Deserialize, Serialize};
 use cdr_encoding_size::*;
 use mio::Token;
-use log::warn;
+use tracing::warn;
 use static_assertions as sa;
 
 use super::parameter_id::ParameterId;
@@ -588,7 +588,7 @@ impl GUIDData {
 mod tests {
   use speedy::Endianness;
   use mio::Token;
-  use log::info;
+  use tracing::info;
   use byteorder::BigEndian;
 
   use super::*;

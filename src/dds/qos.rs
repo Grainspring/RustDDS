@@ -1,7 +1,7 @@
 use std::io;
 
 use speedy::{Endianness, Readable};
-use log::trace;
+use tracing::trace;
 
 use crate::{
   dds::{traits::key::KeyHash, values::result::Result},

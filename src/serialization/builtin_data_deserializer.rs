@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use serde::Deserialize;
 use chrono::Utc;
-use log::{error, warn};
+use tracing::{error, warn};
 
 use crate::{
   dds::{

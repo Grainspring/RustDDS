@@ -8,7 +8,7 @@ use std::{
 
 use mio::Token;
 use mio_extras::{channel as mio_channel, timer::Timer};
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use enumflags2::BitFlags;
 use speedy::{Endianness, Writable};
 
@@ -178,6 +178,7 @@ impl Reader {
     }
   }
 
+  #[tracing::instrument(level = "trace")]
   pub fn send_status_change(&self, change: DataReaderStatus) {
     match self.status_sender.try_send(change) {
       Ok(()) => (), // expected result
@@ -203,6 +204,7 @@ impl Reader {
   // DEADLINE was not respected for a specific instance
   // if statusChange is returned it should be send to DataReader
   // this calculation should be repeated every self.qos_policy.deadline
+  #[tracing::instrument(level = "trace")]
   fn calculate_if_requested_deadline_is_missed(&mut self) -> Vec<DataReaderStatus> {
     debug!("calculate_if_requested_deadline_is_missed");
 
@@ -245,6 +247,7 @@ impl Reader {
     changes
   } // fn
 
+  #[tracing::instrument(level = "trace")]
   pub fn handle_timed_event(&mut self) {
     while let Some(e) = self.timed_event_timer.poll() {
       match e {
@@ -256,8 +259,8 @@ impl Reader {
     }
   }
 
+  #[tracing::instrument(level = "trace")]
   pub fn process_command(&mut self) {
-    trace!("process_command {:?}", self.my_guid);
     loop {
       use std::sync::mpsc::TryRecvError;
       match self.data_reader_command_receiver.try_recv() {
@@ -279,6 +282,7 @@ impl Reader {
     }
   }
 
+  #[tracing::instrument(level = "trace")]
   fn handle_requested_deadline_event(&mut self) {
     debug!("handle_requested_deadline_event");
     for missed_deadline in self.calculate_if_requested_deadline_is_missed() {
@@ -322,6 +326,7 @@ impl Reader {
   }
 
   // updates or adds a new writer proxy, doesn't touch changes
+  #[tracing::instrument(level = "trace")]
   pub fn update_writer_proxy(&mut self, proxy: RtpsWriterProxy, offered_qos: &QosPolicies) {
     debug!("update_writer_proxy topic={:?}", self.topic_name);
     match offered_qos.compliance_failure_wrt(&self.qos_policy) {
@@ -359,6 +364,7 @@ impl Reader {
   }
 
   // return value counts how many new proxies were added
+  #[tracing::instrument(level = "trace")]
   fn matched_writer_update(&mut self, proxy: RtpsWriterProxy) -> i32 {
     if let Some(op) = self.matched_writer_lookup(proxy.remote_writer_guid) {
       op.update_contents(proxy);
@@ -369,6 +375,7 @@ impl Reader {
     }
   }
 
+  #[tracing::instrument(level = "trace")]
   pub fn remove_writer_proxy(&mut self, writer_guid: GUID) {
     if self.matched_writers.contains_key(&writer_guid) {
       self.matched_writers.remove(&writer_guid);
@@ -381,6 +388,7 @@ impl Reader {
 
   // Entire remote participant was lost.
   // Remove all remote readers belonging to it.
+  #[tracing::instrument(level = "trace")]
   pub fn participant_lost(&mut self, guid_prefix: GuidPrefix) {
     let lost_readers: Vec<GUID> = self
       .matched_writers
@@ -400,6 +408,7 @@ impl Reader {
   }
 
   #[cfg(test)]
+  #[tracing::instrument(level = "trace")]
   pub(crate) fn matched_writer_add(
     &mut self,
     remote_writer_guid: GUID,
@@ -422,6 +431,7 @@ impl Reader {
   }
 
   // handles regular data message and updates history cache
+  #[tracing::instrument(level = "trace", skip(data, data_flags))]
   pub fn handle_data_msg(
     &mut self,
     data: Data,
@@ -463,6 +473,7 @@ impl Reader {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(datafrag, datafrag_flags))]
   pub fn handle_datafrag_msg(
     &mut self,
     datafrag: &DataFrag,
@@ -532,6 +543,7 @@ impl Reader {
 
   // common parts of processing DATA or a completed DATAFRAG (when all frags are
   // received)
+  #[tracing::instrument(level = "trace", skip(ddsdata))]
   fn process_received_data(
     &mut self,
     ddsdata: DDSData,
@@ -541,7 +553,7 @@ impl Reader {
     writer_sn: SequenceNumber,
   ) {
     trace!(
-      "handle_data_msg from {:?} seq={:?} topic={:?} reliability={:?} stateful={:?}",
+      "process_received_data from {:?} seq={:?} topic={:?} reliability={:?} stateful={:?}",
       &writer_guid,
       writer_sn,
       self.topic_name,
@@ -553,7 +565,10 @@ impl Reader {
       if let Some(writer_proxy) = self.matched_writer_lookup(writer_guid) {
         if writer_proxy.should_ignore_change(writer_sn) {
           // change already present
-          debug!("handle_data_msg already have this seq={:?}", writer_sn);
+          debug!(
+            "process_received_data already have this seq={:?}",
+            writer_sn
+          );
           if my_entityid == EntityId::SPDP_BUILTIN_PARTICIPANT_READER {
             debug!("Accepting duplicate message to participant reader.");
             // This is an attmpted workaround to eProsima FastRTPS not
@@ -568,7 +583,7 @@ impl Reader {
       } else {
         // no writer proxy found
         info!(
-          "handle_data_msg in stateful Reader {:?} has no writer proxy for {:?} topic={:?}",
+          "process_received_data in stateful Reader {:?} has no writer proxy for {:?} topic={:?}",
           my_entityid, writer_guid, self.topic_name,
         );
       }
@@ -592,6 +607,7 @@ impl Reader {
     self.notify_cache_change();
   }
 
+  #[tracing::instrument(level = "trace", skip(data, data_flags))]
   fn data_to_ddsdata(
     &self,
     data: Data,
@@ -668,6 +684,7 @@ impl Reader {
   // Returns if responding with ACKNACK?
   // TODO: Return value seems to go unused in callers.
   // ...except in test cases, but not sure if this is strictly necessary to have.
+  #[tracing::instrument(level = "trace", skip(heartbeat))]
   pub fn handle_heartbeat_msg(
     &mut self,
     heartbeat: &Heartbeat,
@@ -878,6 +895,7 @@ impl Reader {
     false
   } // fn
 
+  #[tracing::instrument(level = "trace")]
   pub fn handle_gap_msg(&mut self, gap: &Gap, mr_state: &MessageReceiverState) {
     // ATM all things related to groups is ignored. TODO?
 
@@ -950,6 +968,7 @@ impl Reader {
 
   // This is used to determine exact change kind in case we do not get a data
   // payload in DATA submessage
+  #[tracing::instrument(level = "trace")]
   fn deduce_change_kind(
     inline_qos: &Option<ParameterList>,
     no_writers: bool,
@@ -972,6 +991,7 @@ impl Reader {
   }
 
   // Convert DATA submessage into a CacheChange and update history cache
+  #[tracing::instrument(level = "trace", skip(data))]
   fn make_cache_change(
     &mut self,
     data: DDSData,
@@ -991,6 +1011,7 @@ impl Reader {
 
   // notifies DataReaders (or any listeners that history cache has changed for
   // this reader) likely use of mio channel
+  #[tracing::instrument(level = "trace")]
   pub fn notify_cache_change(&self) {
     match self.notification_sender.try_send(()) {
       Ok(()) => (),
@@ -1006,6 +1027,7 @@ impl Reader {
     }
   }
 
+  #[tracing::instrument(level = "trace")]
   fn send_acknack_to(
     &self,
     flags: BitFlags<ACKNACK_Flags>,
@@ -1035,6 +1057,7 @@ impl Reader {
       .send_to_locator_list(&bytes, dst_localtor_list);
   }
 
+  #[tracing::instrument(level = "trace")]
   fn send_nackfrags_to(
     &self,
     flags: BitFlags<NACKFRAG_Flags>,
@@ -1066,6 +1089,7 @@ impl Reader {
       .send_to_locator_list(&bytes, dst_locator_list);
   }
 
+  #[tracing::instrument(level = "trace")]
   pub fn send_preemptive_acknacks(&mut self) {
     let flags = BitFlags::<ACKNACK_Flags>::from_flag(ACKNACK_Flags::Endianness);
     // Do not set final flag --> we are requesting immediate heartbeat from writers.

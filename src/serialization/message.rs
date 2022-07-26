@@ -1,7 +1,7 @@
 use std::{cmp::min, collections::BTreeSet, convert::TryInto, io};
 
 #[allow(unused_imports)]
-use log::{debug, error, trace, warn};
+use tracing::{debug, error, trace, warn};
 use speedy::{Context, Endianness, Readable, Writable, Writer};
 use enumflags2::BitFlags;
 use bytes::Bytes;
@@ -605,7 +605,7 @@ impl MessageBuilder {
 #[cfg(test)]
 mod tests {
   #![allow(non_snake_case)]
-  use log::info;
+  use tracing::info;
   use speedy::Writable;
 
   use super::*;

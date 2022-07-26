@@ -5,7 +5,7 @@ use std::{
   time::{Duration, Instant},
 };
 
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use mio::{Event, Events, Poll, PollOpt, Ready, Token};
 use mio_extras::channel as mio_channel;
 
@@ -357,10 +357,10 @@ impl DPEventLoop {
     } // loop
   } // fn
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn handle_reader_action(&mut self, event: &Event) {
     match event.token() {
       ADD_READER_TOKEN => {
-        trace!("add reader(s)");
         while let Ok(new_reader_ing) = self.add_reader_receiver.receiver.try_recv() {
           let timer = mio_extras::timer::Builder::default().num_slots(8).build();
           self
@@ -391,7 +391,7 @@ impl DPEventLoop {
             .expect("Reader command channel registration failed!!!");
 
           new_reader.set_requested_deadline_check_timer();
-          trace!("Add reader: {:?}", new_reader);
+          trace!("MessageReceiver Add reader: {:?}", new_reader);
           self.message_receiver.add_reader(new_reader);
         }
       }
@@ -417,6 +417,7 @@ impl DPEventLoop {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn handle_writer_action(&mut self, event: &Event) {
     match event.token() {
       ADD_WRITER_TOKEN => {
@@ -471,6 +472,7 @@ impl DPEventLoop {
   /// Writer timed events can be heatrbeats or cache cleaning events.
   /// events are distinguished by TimerMessageType which is send via mio
   /// channel. Channel token in
+  #[tracing::instrument(level = "trace", skip(self))]
   fn handle_writer_timed_event(&mut self, entity_id: EntityId) {
     if let Some(writer) = self.writers.get_mut(&entity_id) {
       writer.handle_timed_event();
@@ -479,6 +481,7 @@ impl DPEventLoop {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn handle_reader_timed_event(&mut self, entity_id: EntityId) {
     if let Some(reader) = self.message_receiver.reader_mut(entity_id) {
       reader.handle_timed_event();
@@ -487,6 +490,7 @@ impl DPEventLoop {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn handle_writer_acknack_action(&mut self, _event: &Event) {
     while let Ok((acknack_sender_prefix, acknack_submessage)) = self.ack_nack_receiver.try_recv() {
       let writer_guid = GUID::new_with_prefix_and_id(
@@ -507,6 +511,7 @@ impl DPEventLoop {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn update_participant(&mut self, participant_guid_prefix: GuidPrefix) {
     debug!(
       "update_participant {:?} myself={}",
@@ -553,7 +558,6 @@ impl DPEventLoop {
         ),
       ] {
         if let Some(writer) = self.writers.get_mut(writer_eid) {
-          debug!("update_discovery_writer - {:?}", writer.topic_name());
           let mut qos = Discovery::subscriber_qos();
           // special case by RTPS 2.3 spec Section
           // "8.4.13.3 BuiltinParticipantMessageWriter and
@@ -589,10 +593,6 @@ impl DPEventLoop {
             }
             // common processing for SPDP and SEDP
             writer.update_reader_proxy(&reader_proxy, &qos);
-            debug!(
-              "update_discovery writer - endpoint {:?} - {:?}",
-              endpoint, discovered_participant.participant_guid
-            );
           }
 
           writer.notify_new_data_to_all_readers();
@@ -650,12 +650,9 @@ impl DPEventLoop {
         }
       } // for
     } // if
-    debug!(
-      "update_participant - finished for {:?}",
-      participant_guid_prefix
-    );
   } // fn
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn remote_participant_lost(&mut self, participant_guid_prefix: GuidPrefix) {
     info!(
       "remote_participant_lost guid_prefix={:?}",
@@ -674,6 +671,7 @@ impl DPEventLoop {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn remote_reader_discovered(&mut self, drd: &DiscoveredReaderData) {
     for writer in self.writers.values_mut() {
       if drd.subscription_topic_data.topic_name() == writer.topic_name() {
@@ -695,12 +693,14 @@ impl DPEventLoop {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn remote_reader_lost(&mut self, reader_guid: GUID) {
     for writer in self.writers.values_mut() {
       writer.reader_lost(reader_guid);
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn remote_writer_discovered(&mut self, dwd: &DiscoveredWriterData) {
     // update writer proxies in local readers
     for reader in self.message_receiver.available_readers.values_mut() {
@@ -733,6 +733,7 @@ impl DPEventLoop {
     }
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn remote_writer_lost(&mut self, writer_guid: GUID) {
     for reader in self.message_receiver.available_readers.values_mut() {
       reader.remove_writer_proxy(writer_guid);

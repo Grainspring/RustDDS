@@ -554,7 +554,7 @@ where
 mod tests {
   #![allow(clippy::needless_pass_by_value)]
   use byteorder::{BigEndian, LittleEndian};
-  use log::info;
+  use tracing::info;
   use serde::{Deserialize, Serialize};
   use test_case::test_case;
 

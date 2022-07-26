@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bit_vec::BitVec;
 #[allow(unused_imports)]
-use log::{debug, error, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 use crate::{
   dds::{participant::DomainParticipant, qos::QosPolicies},

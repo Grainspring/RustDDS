@@ -11,7 +11,7 @@ use mio::{Evented, Events, Poll, PollOpt, Ready, Token};
 use mio_extras::channel::{self as mio_channel, Receiver, SendError};
 use serde::Serialize;
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
   dds::{
@@ -223,6 +223,7 @@ where
     })
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn next_sequence_number(&self) -> SequenceNumber {
     SequenceNumber::from(
       self
@@ -231,6 +232,7 @@ where
     )
   }
 
+  #[tracing::instrument(level = "trace", skip(self))]
   fn undo_sequence_number(&self) {
     self
       .available_sequence_number
@@ -277,6 +279,7 @@ where
   /// ```
 
   // TODO: What is this function? To what part of DDS spec does it correspond to?
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn refresh_manual_liveliness(&self) {
     if let Some(lv) = self.qos().liveliness {
       match lv {
@@ -327,12 +330,16 @@ where
   /// let some_data = SomeType { a: 1 };
   /// data_writer.write(some_data, None).unwrap();
   /// ```
+  #[tracing::instrument(level = "trace", skip(self, data))]
   pub fn write(&self, data: D, source_timestamp: Option<Timestamp>) -> Result<()> {
+    trace!("datawriter write data");
     self.write_with_options(data, WriteOptions::from(source_timestamp))?;
     Ok(())
   }
 
+  #[tracing::instrument(level = "trace", skip(self, data))]
   pub fn write_with_options(&self, data: D, write_options: WriteOptions) -> Result<SampleIdentity> {
+    trace!("datawriter.write_with_options");
     let send_buffer = SA::to_bytes(&data)?; // serialize
 
     let ddsdata = DDSData::new(SerializedPayload::new_from_bytes(
@@ -420,6 +427,7 @@ where
   /// data_writer.write(some_data, None).unwrap();
   /// data_writer.wait_for_acknowledgments(std::time::Duration::from_millis(100));
   /// ```
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn wait_for_acknowledgments(&self, max_wait: Duration) -> Result<bool> {
     match &self.qos_policy.reliability {
       None | Some(Reliability::BestEffort) => Ok(true),
@@ -799,6 +807,7 @@ where
   // TODO: This cannot really fail, so could change type to () (alternatively,
   // make send error visible) TODO: Better make send failure visible, so
   // application can see if Discovery has failed.
+  #[tracing::instrument(level = "trace", skip(self))]
   pub fn assert_liveliness(&self) -> Result<()> {
     self.refresh_manual_liveliness();
 
@@ -909,6 +918,7 @@ where
   /// // disposes both some_data_1_1 and some_data_1_2. They are no longer offered by this writer to this topic.
   /// data_writer.dispose(&1, None).unwrap();
   /// ```
+  #[tracing::instrument(level = "trace", skip(self, key))]
   pub fn dispose(&self, key: &<D as Keyed>::K, source_timestamp: Option<Timestamp>) -> Result<()> {
     let send_buffer = SA::key_to_bytes(key)?; // serialize key
 
@@ -985,7 +995,7 @@ mod tests {
   use std::thread;
 
   use byteorder::LittleEndian;
-  use log::info;
+  use tracing::info;
 
   use super::*;
   use crate::{

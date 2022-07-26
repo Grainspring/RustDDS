@@ -12,7 +12,7 @@ use num_traits::NumOps;
 use num_derive::{FromPrimitive, NumOps, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use speedy::{Context, Readable, Reader, Writable, Writer};
-use log::error;
+use tracing::error;
 
 //
 /// RTPS Specification v2.3 Section "8.3.5.4 SequenceNumber"

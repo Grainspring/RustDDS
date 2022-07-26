@@ -2,7 +2,7 @@ use std::mem::size_of;
 
 use enumflags2::BitFlags;
 #[allow(unused_imports)]
-use log::error;
+use tracing::error;
 use speedy::{Readable, Writable};
 
 use crate::{
